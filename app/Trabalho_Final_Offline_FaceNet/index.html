@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Recognition Dashboard</title>
+<style>
+  :root{
+    --bg: #f3f5f9;
+    --panel: #ffffff;
+    --panel-border: #e6e9f0;
+    --ink: #1a2233;
+    --ink-soft: #6b7280;
+    --ink-faint: #9aa2b1;
+    --blue: #2f5bea;
+    --blue-soft: #eaf0ff;
+    --green: #16a34a;
+    --green-soft: #eafaf0;
+    --amber: #d97706;
+    --amber-soft: #fff6e8;
+    --red: #dc2626;
+    --red-soft: #fdeceb;
+    --violet: #7c5cff;
+    --video-bg: #10131f;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(16,20,34,.04), 0 6px 20px rgba(16,20,34,.05);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 12px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+    position: sticky;
+    top:0;
+    z-index: 20;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand .mark{
+    width:36px; height:36px; border-radius:10px;
+    background: linear-gradient(135deg, var(--blue), var(--violet));
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:15px;
+    box-shadow: 0 4px 10px rgba(47,91,234,.25);
+  }
+  .brand h1{font-size:15px; font-weight:600; letter-spacing:-.01em;}
+  .brand .sub{font-size:11.5px; color:var(--ink-faint); margin-top:1px;}
+
+  .status-legend{display:flex; align-items:center; gap:8px;}
+  .pill{
+    font-size:11px; padding:5px 10px; border-radius:999px;
+    font-weight:600; letter-spacing:.01em;
+    display:flex; align-items:center; gap:5px;
+    border:1px solid transparent;
+    cursor:default; user-select:none;
+    opacity:.55;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .pill:hover{opacity:1; transform:translateY(-1px);}
+  .pill .dot{width:6px; height:6px; border-radius:50%;}
+  .pill.waiting{color:#6b7280; background:#f1f2f5;}
+  .pill.waiting .dot{background:#9aa2b1;}
+  .pill.detecting{color:var(--blue); background:var(--blue-soft);}
+  .pill.detecting .dot{background:var(--blue);}
+  .pill.recognized{color:var(--green); background:var(--green-soft);}
+  .pill.recognized .dot{background:var(--green);}
+  .pill.unknown{color:var(--amber); background:var(--amber-soft);}
+  .pill.unknown .dot{background:var(--amber);}
+  .pill.error{color:var(--red); background:var(--red-soft);}
+  .pill.error .dot{background:var(--red);}
+  .pill.active{opacity:1;}
+
+  .topbar-right{display:flex; align-items:center; gap:16px;}
+  .conn-status{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-faint); font-weight:500;}
+  .conn-status .dot{width:7px; height:7px; border-radius:50%; background:var(--ink-faint);}
+  .conn-status.online .dot{background:var(--green); box-shadow:0 0 0 3px var(--green-soft);}
+  .conn-status.online{color:var(--green);}
+  .avatar-you{
+    width:32px; height:32px; border-radius:50%;
+    background: linear-gradient(135deg, var(--violet), var(--blue));
+    color:#fff; font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns: 1fr 340px;
+    gap:20px;
+    padding: 20px 24px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 980px){
+    .layout{grid-template-columns: 1fr;}
+  }
+
+  .card{
+    background: var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+  }
+  .card-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 18px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .card-title{
+    font-size:12.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink);
+    display:flex; align-items:center; gap:8px;
+  }
+  .card-title .live-dot{
+    width:7px; height:7px; border-radius:50%; background: var(--ink-faint);
+  }
+  .card-title .live-dot.on{background: var(--red); box-shadow:0 0 0 3px var(--red-soft);}
+  .link{font-size:12px; color:var(--blue); font-weight:600; cursor:pointer; text-decoration:none;}
+  .link:hover{text-decoration:underline;}
+
+  /* ---------- Video panel ---------- */
+  .video-wrap{padding:16px;}
+  .video-frame{
+    position:relative;
+    width:100%;
+    aspect-ratio: 16/9;
+    background: var(--video-bg);
+    border-radius: var(--radius-md);
+    overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(47,91,234,.10), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(124,92,255,.10), transparent 40%);
+  }
+  .video-frame video, .video-frame canvas{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+  }
+  .video-placeholder{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    color:#5b6478;
+  }
+  .video-placeholder .icon{
+    width:44px; height:44px; border-radius:12px;
+    background:rgba(255,255,255,.06);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .video-placeholder span{font-size:13px; font-weight:500; color:#7c86a0;}
+
+  .scan-overlay{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s ease;}
+  .scan-overlay.on{opacity:1;}
+  .scan-line{
+    position:absolute; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, transparent, #4f7cff, transparent);
+    box-shadow: 0 0 12px 2px rgba(79,124,255,.7);
+    animation: scan 2.2s ease-in-out infinite;
+  }
+  @keyframes scan{
+    0%{top:6%;} 50%{top:92%;} 100%{top:6%;}
+  }
+  .face-box{
+    position:absolute;
+    border:2px solid var(--green);
+    border-radius:6px;
+    box-shadow: 0 0 0 3000px rgba(0,0,0,0) , 0 0 16px rgba(22,163,74,.35);
+    transition: opacity .25s ease;
+  }
+  .face-box .tag{
+    position:absolute; top:-24px; left:0;
+    font-size:10.5px; font-weight:700; color:#fff;
+    background: var(--green);
+    padding:2px 7px; border-radius:5px;
+    white-space:nowrap;
+  }
+  .face-box.unknown{border-color: var(--amber);}
+  .face-box.unknown .tag{background: var(--amber);}
+
+  .video-footer{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 4px 4px;
+  }
+  .video-meta{font-size:12px; color:var(--ink-faint); font-weight:500;}
+
+  .btn{
+    border:none; cursor:pointer;
+    font-size:13px; font-weight:600;
+    padding: 10px 18px;
+    border-radius: 10px;
+    display:inline-flex; align-items:center; gap:8px;
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
+  }
+  .btn:active{transform: scale(.97);}
+  .btn-primary{
+    background: var(--blue); color:#fff;
+    box-shadow: 0 4px 14px rgba(47,91,234,.3);
+  }
+  .btn-primary:hover{background:#2650d6;}
+  .btn-stop{
+    background: var(--red-soft); color: var(--red);
+  }
+  .btn-stop:hover{background:#fbdcda;}
+  .btn svg{width:14px; height:14px;}
+
+  /* mini info cards under video */
+  .mini-grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:12px;
+    padding: 0 16px 16px;
+  }
+  @media (max-width: 700px){ .mini-grid{grid-template-columns: repeat(2,1fr);} }
+  .mini-card{
+    border:1px solid var(--panel-border);
+    border-radius: var(--radius-sm);
+    padding: 11px 13px;
+    background:#fbfcfe;
+  }
+  .mini-card .label{font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:6px;}
+  .mini-card .value{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px;}
+  .mini-card .value .dot{width:7px; height:7px; border-radius:50%;}
+  .dot-red{background:var(--red);}
+  .dot-green{background:var(--green);}
+  .dot-blue{background:var(--blue);}
+
+  /* ---------- Right column ---------- */
+  .right-col{display:flex; flex-direction:column; gap:20px;}
+
+  .person-body{
+    padding: 18px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .person-avatar{
+    width:56px; height:56px; border-radius:50%;
+    background: var(--blue-soft);
+    display:flex; align-items:center; justify-content:center;
+    color: var(--ink-faint);
+    flex-shrink:0;
+    font-size:20px; font-weight:700;
+    overflow:hidden;
+    transition: background .2s ease, color .2s ease;
+  }
+  .person-name{font-weight:700; font-size:14.5px; color: var(--ink-faint);}
+  .person-sub{font-size:12px; color: var(--ink-faint); margin-top:2px;}
+
+  .metrics-body{padding: 6px 18px 16px;}
+  .metric-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 11px 0;
+    border-bottom: 1px solid #f0f1f5;
+    font-size:13px;
+  }
+  .metric-row:last-child{border-bottom:none;}
+  .metric-row .k{color: var(--ink-soft); font-weight:500;}
+  .metric-row .v{font-weight:700; color: var(--ink-faint); font-variant-numeric: tabular-nums;}
+  .metric-row .v.filled{color: var(--ink);}
+
+  .model-body{padding: 14px 18px 18px;}
+  .model-tag{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11px; font-weight:600; color:var(--violet);
+    background: #f3f0ff; padding:3px 9px; border-radius:999px;
+    margin-bottom:14px;
+  }
+  .gauge{margin-bottom:14px;}
+  .gauge:last-of-type{margin-bottom:0;}
+  .gauge-top{display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;}
+  .gauge-top .k{color:var(--ink-soft); font-weight:500;}
+  .gauge-top .v{font-weight:700; color:var(--ink);}
+  .gauge-track{height:6px; border-radius:99px; background:#eef0f4; overflow:hidden;}
+  .gauge-fill{height:100%; border-radius:99px; background: linear-gradient(90deg, var(--green), #22c55e); width:0%; transition: width 1s cubic-bezier(.22,1,.36,1);}
+
+  .totals-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-top:14px; margin-top:4px; border-top:1px solid #f0f1f5;
+  }
+  .totals-row .k{font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-faint);}
+  .totals-row .v{font-size:16px; font-weight:800; color:var(--red);}
+
+  .history-list{padding: 6px 10px 12px;}
+  .history-item{
+    display:flex; align-items:center; gap:10px;
+    padding: 9px 8px;
+    border-radius: 10px;
+    transition: background .15s ease;
+  }
+  .history-item:hover{background:#f7f8fb;}
+  .h-avatar{
+    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px; font-weight:700;
+  }
+  .h-info{flex:1; min-width:0;}
+  .h-name{font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .h-time{font-size:11px; color:var(--ink-faint); margin-top:1px;}
+  .h-score{
+    font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; flex-shrink:0;
+  }
+  .h-score.high{color:var(--green); background:var(--green-soft);}
+  .h-score.mid{color:var(--amber); background:var(--amber-soft);}
+
+  .empty-fade{animation: fadein .4s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:translateY(0);}}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:#dde1ea; border-radius:8px;}
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">FR</div>
+      <div>
+        <h1>Face Recognition Dashboard</h1>
+        <div class="sub">MVP · v0.4.2</div>
+      </div>
+    </div>
+
+    <div class="status-legend" id="legend">
+      <div class="pill waiting" data-state="waiting"><span class="dot"></span>waiting</div>
+      <div class="pill detecting" data-state="detecting"><span class="dot"></span>detecting</div>
+      <div class="pill recognized" data-state="recognized"><span class="dot"></span>recognized</div>
+      <div class="pill unknown" data-state="unknown"><span class="dot"></span>unknown</div>
+      <div class="pill error" data-state="error"><span class="dot"></span>error</div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="conn-status" id="connStatus"><span class="dot"></span><span id="connLabel">Offline</span></div>
+      <div class="avatar-you">A</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT -->
+    <div class="left-col">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="live-dot" id="liveDot"></span>Feed ao Vivo</div>
+          <div class="link" id="cameraStateLabel">Câmera desligada</div>
+        </div>
+
+        <div class="video-wrap">
+          <div class="video-frame" id="videoFrame">
+            <video id="video" autoplay muted playsinline style="display:none;"></video>
+            <div class="video-placeholder" id="videoPlaceholder">
+              <div class="icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c86a0" stroke-width="1.6"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              </div>
+              <span>Câmera desligada</span>
+            </div>
+            <div class="scan-overlay" id="scanOverlay">
+              <div class="scan-line"></div>
+              <div id="faceBoxes"></div>
+            </div>
+          </div>
+
+          <div class="video-footer">
+            <div class="video-meta">Resolução: 1920×1080 · FPS: 30</div>
+            <button class="btn btn-primary" id="camBtn">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path id="camIconPath" d="M8 5v14l11-7z"/></svg>
+              <span id="camBtnLabel">Iniciar Câmera</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="mini-grid">
+          <div class="mini-card">
+            <div class="label">Câmera</div>
+            <div class="value" id="miniCam"><span class="dot dot-red"></span>Inativa</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">Backend</div>
+            <div class="value"><span class="dot dot-green"></span>Conectado</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">Modelo</div>
+            <div class="value"><span class="dot dot-blue"></span>FaceNet v2.1</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">GPU</div>
+            <div class="value"><span class="dot dot-green"></span>CUDA · RTX 3080</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Pessoa Reconhecida</div></div>
+        <div class="person-body">
+          <div class="person-avatar" id="personAvatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+          </div>
+          <div>
+            <div class="person-name" id="personName">Nenhuma identificação</div>
+            <div class="person-sub" id="personSub">Aguardando detecção</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Resultado da Predição</div></div>
+        <div class="metrics-body">
+          <div class="metric-row"><span class="k">Confiança</span><span class="v" id="mConf">–</span></div>
+          <div class="metric-row"><span class="k">Tempo de inferência</span><span class="v" id="mInf">–</span></div>
+          <div class="metric-row"><span class="k">Latência total</span><span class="v" id="mLat">–</span></div>
+          <div class="metric-row"><span class="k">Distância embedding</span><span class="v" id="mDist">–</span></div>
+          <div class="metric-row"><span class="k">Rostos detectados</span><span class="v filled" id="mFaces">0</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Métricas do Modelo</div></div>
+        <div class="model-body">
+          <div class="model-tag">FaceNet v2.1</div>
+
+          <div class="gauge">
+            <div class="gauge-top"><span class="k">Acurácia</span><span class="v">96.7%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" data-target="96.7"></div></div>
+          </div>
+          <div class="gauge">
+            <div class="gauge-top"><span class="k">Precisão</span><span class="v">95.2%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" data-target="95.2"></div></div>
+          </div>
+          <div class="gauge">
+            <div class="gauge-top"><span class="k">Recall</span><span class="v">97.1%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" data-target="97.1"></div></div>
+          </div>
+          <div class="gauge">
+            <div class="gauge-top"><span class="k">F1-Score</span><span class="v">96.1%</span></div>
+            <div class="gauge-track"><div class="gauge-fill" data-target="96.1"></div></div>
+          </div>
+
+          <div class="totals-row">
+            <span class="k">Total de identificações</span>
+            <span class="v" id="totalIds">1.847</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Histórico Recente</div>
+          <a class="link">Ver todos</a>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ---------- elements ----------
+  const camBtn = document.getElementById('camBtn');
+  const camBtnLabel = document.getElementById('camBtnLabel');
+  const camIconPath = document.getElementById('camIconPath');
+  const videoPlaceholder = document.getElementById('videoPlaceholder');
+  const video = document.getElementById('video');
+  const cameraStateLabel = document.getElementById('cameraStateLabel');
+  const liveDot = document.getElementById('liveDot');
+  const scanOverlay = document.getElementById('scanOverlay');
+  const faceBoxesEl = document.getElementById('faceBoxes');
+  const miniCam = document.getElementById('miniCam');
+  const legend = document.getElementById('legend');
+  const connStatus = document.getElementById('connStatus');
+  const connLabel = document.getElementById('connLabel');
+
+  const personAvatar = document.getElementById('personAvatar');
+  const personName = document.getElementById('personName');
+  const personSub = document.getElementById('personSub');
+
+  const mConf = document.getElementById('mConf');
+  const mInf = document.getElementById('mInf');
+  const mLat = document.getElementById('mLat');
+  const mDist = document.getElementById('mDist');
+  const mFaces = document.getElementById('mFaces');
+  const totalIds = document.getElementById('totalIds');
+  const historyList = document.getElementById('historyList');
+  
+  // Elemento do seletor de câmera
+  let cameraSelect = document.getElementById('cameraSelect');
+
+  // ---------- Globals ----------
+  let running = false;
+  let stream = null;
+  let ws = null;
+  let total = 0; // Zerado (removido valor fixo de protótipo)
+  let history = []; 
+  let ultimaPessoaReconhecida = null; // Variável de controle de estado (Delta)
+  let ultimaAtualizacaoMetricas = 0;
+  
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const colors = ["#2f5bea","#7c5cff","#16a34a","#d97706","#dc2626","#0891b2","#db2777","#65a30d"];
+
+  // ---------- Helpers ----------
+  function initials(name){
+    return name.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  }
+  function colorFor(name){
+    let h = 0; for (const c of name) h = (h*31 + c.charCodeAt(0)) % colors.length;
+    return colors[h];
+  }
+  function pad(n){ return n.toString().padStart(2,"0"); }
+  function nowLabel(){
+    const d = new Date();
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function renderHistory(){
+    historyList.innerHTML = "";
+    history.slice(0,6).forEach(([name,time,score]) => {
+      const row = document.createElement('div');
+      row.className = 'history-item empty-fade';
+      const cls = score >= 90 ? 'high' : 'mid';
+      row.innerHTML = `
+        <div class="h-avatar" style="background:${colorFor(name)}">${initials(name)}</div>
+        <div class="h-info">
+          <div class="h-name">${name}</div>
+          <div class="h-time">${time}</div>
+        </div>
+        <div class="h-score ${cls}">${score.toFixed(1)}%</div>
+      `;
+      historyList.appendChild(row);
+    });
+  }
+
+  function setLegendState(state){
+    [...legend.children].forEach(p => p.classList.toggle('active', p.dataset.state === state));
+  }
+
+  function setPersonUnknown(){
+    personAvatar.style.background = 'var(--blue-soft)';
+    personAvatar.style.color = 'var(--ink-faint)';
+    personAvatar.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>`;
+    personName.textContent = 'Nenhuma identificação';
+    personName.style.color = 'var(--ink-faint)';
+    personSub.textContent = running ? 'Analisando quadro...' : 'Aguardando detecção';
+  }
+
+  function setPersonRecognized(name, score){
+    const c = colorFor(name);
+    personAvatar.style.background = c;
+    personAvatar.style.color = '#fff';
+    personAvatar.innerHTML = initials(name);
+    personName.textContent = name;
+    personName.style.color = 'var(--ink)';
+    personSub.textContent = `Confiança de ${score.toFixed(1)}%`;
+  }
+
+  function drawFaceBox(recognized, name){
+    faceBoxesEl.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'face-box' + (recognized ? '' : ' unknown');
+    box.style.left = '35%';
+    box.style.top = '15%';
+    box.style.width = '30%';
+    box.style.height = '60%';
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = recognized ? name : 'Desconhecido';
+    box.appendChild(tag);
+    faceBoxesEl.appendChild(box);
+  }
+
+  // ---------- Camera, WebSocket & Metrics Logic ----------
+  
+  async function carregarMetricasOffline() {
+    try {
+      const response = await fetch('/metricas.json');
+      const metricas = await response.json();
+
+      const valores = document.querySelectorAll('.gauge-top .v');
+      if (valores.length >= 4) {
+        valores[0].textContent = metricas.acuracia + '%';
+        valores[1].textContent = metricas.precisao + '%';
+        valores[2].textContent = metricas.recall + '%';
+        valores[3].textContent = metricas.f1_score + '%';
+      }
+
+      const barras = document.querySelectorAll('.gauge-fill');
+      if (barras.length >= 4) {
+        barras[0].dataset.target = metricas.acuracia;
+        barras[1].dataset.target = metricas.precisao;
+        barras[2].dataset.target = metricas.recall;
+        barras[3].dataset.target = metricas.f1_score;
+      }
+
+      barras.forEach(el => {
+        requestAnimationFrame(() => { el.style.width = el.dataset.target + '%'; });
+      });
+    } catch (e) {
+      console.warn("Arquivo metricas.json não encontrado. Usando valores zerados.");
+    }
+  }
+
+  async function listarCameras() {
+    if (!cameraSelect) return;
+    try {
+      const dispositivos = await navigator.mediaDevices.enumerateDevices();
+      const cameras = dispositivos.filter(device => device.kind === 'videoinput');
+      
+      cameraSelect.innerHTML = '';
+      cameras.forEach(camera => {
+        const option = document.createElement('option');
+        option.value = camera.deviceId;
+        option.text = camera.label || `Câmera ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    } catch (e) {
+      console.log("Erro ao listar câmeras:", e);
+    }
+  }
+
+  function iniciarConexaoWebsocket() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/video`);
+    
+    ws.onopen = () => {
+      connStatus.classList.add('online');
+      connLabel.textContent = 'Online';
+      capturarEEnviarFrame();
+    };
+
+    ws.onmessage = (event) => {
+      if (!running) return;
+      
+      const data = JSON.parse(event.data);
+      
+      const agora = Date.now();
+      if (agora - ultimaAtualizacaoMetricas > 500) {
+        mFaces.textContent = data.rostos_encontrados !== undefined ? data.rostos_encontrados : '0';
+        mInf.textContent = data.tempo_inferencia + ' ms';
+        mLat.textContent = data.tempo_inferencia + ' ms'; 
+        mConf.textContent = data.confianca + '%';
+        mDist.textContent = data.distancia.toFixed(3); 
+        
+        ultimaAtualizacaoMetricas = agora; // Reseta o cronômetro
+      }
+
+      // ========================================================
+      // LÓGICA DE ATUALIZAÇÃO VISUAL E CONTROLE DE SPAM
+      // ========================================================
+      if (data.reconhecido) {
+        setLegendState('recognized');
+        setPersonRecognized(data.nome, data.confianca);
+        drawFaceBox(true, data.nome);
+        
+        // Só adiciona se o histórico estiver vazio ou se o último rosto detectado for diferente
+        if (history.length === 0 || history[0][0] !== data.nome) {
+          history.unshift([data.nome, nowLabel(), data.confianca]);
+          total += 1;
+          totalIds.textContent = total.toLocaleString('pt-BR');
+          renderHistory();
+        }
+      } else if (data.rostos_encontrados > 0) {
+        // Encontrou um rosto, mas passou do limiar (Invasor)
+        setLegendState('unknown');
+        setPersonUnknown();
+        drawFaceBox(false, '');
+        
+        // Só registra o desconhecido 1 vez seguida
+        if (history.length === 0 || history[0][0] !== 'Desconhecido') {
+          history.unshift(['Desconhecido', nowLabel(), 0.0]);
+          total += 1;
+          totalIds.textContent = total.toLocaleString('pt-BR');
+          renderHistory();
+        }
+      } else {
+        // Não tem rosto nenhum na câmera: Apenas limpa a interface, não altera histórico
+        setLegendState('waiting');
+        setPersonUnknown();
+        drawFaceBox(false, '');
+      }
+
+      setTimeout(() => {
+        if (running) requestAnimationFrame(capturarEEnviarFrame);
+      }, 100); 
+    };
+
+    ws.onclose = () => {
+      connStatus.classList.remove('online');
+      connLabel.textContent = 'Offline';
+    };
+  }
+
+  function capturarEEnviarFrame() {
+    if (!running || ws.readyState !== WebSocket.OPEN) return;
+    
+    if (canvas.width !== video.videoWidth) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64Frame = canvas.toDataURL('image/jpeg', 0.6); 
+    ws.send(base64Frame);
+  }
+
+  async function startCamera(){
+    camBtn.disabled = true;
+    try {
+      const cameraId = cameraSelect && cameraSelect.value ? cameraSelect.value : null;
+      
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        video: cameraId ? { deviceId: { exact: cameraId } } : true 
+      });
+      
+      video.srcObject = stream;
+      video.style.display = 'block';
+      videoPlaceholder.style.display = 'none';
+      
+      video.onloadedmetadata = () => {
+        video.play();
+        iniciarConexaoWebsocket();
+      };
+      
+    } catch (e) {
+      videoPlaceholder.querySelector('span').textContent = 'Sem acesso à câmera';
+    }
+    
+    camBtn.disabled = false;
+    running = true;
+    camBtnLabel.textContent = 'Parar Câmera';
+    camBtn.classList.remove('btn-primary');
+    camBtn.classList.add('btn-stop');
+    camIconPath.setAttribute('d', 'M6 6h12v12H6z');
+    cameraStateLabel.textContent = 'Câmera ligada';
+    liveDot.classList.add('on');
+    scanOverlay.classList.add('on');
+    miniCam.innerHTML = '<span class="dot dot-green"></span>Ativa';
+  }
+
+  function stopCamera(){
+    running = false;
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.style.display = 'none';
+    videoPlaceholder.style.display = 'flex';
+    videoPlaceholder.querySelector('span').textContent = 'Câmera desligada';
+    camBtnLabel.textContent = 'Iniciar Câmera';
+    camBtn.classList.remove('btn-stop');
+    camBtn.classList.add('btn-primary');
+    camIconPath.setAttribute('d', 'M8 5v14l11-7z');
+    cameraStateLabel.textContent = 'Câmera desligada';
+    liveDot.classList.remove('on');
+    scanOverlay.classList.remove('on');
+    faceBoxesEl.innerHTML = '';
+    miniCam.innerHTML = '<span class="dot dot-red"></span>Inativa';
+    connStatus.classList.remove('online');
+    connLabel.textContent = 'Offline';
+    setLegendState(null);
+    setPersonUnknown();
+    mConf.textContent = '–'; mInf.textContent = '–'; mLat.textContent = '–'; mDist.textContent = '–'; mFaces.textContent = '0';
+    ultimaPessoaReconhecida = null; // Reseta o estado ao desligar
+  }
+
+  camBtn.addEventListener('click', () => running ? stopCamera() : startCamera());
+
+  // init
+  listarCameras();
+  renderHistory();
+  setPersonUnknown();
+  totalIds.textContent = '0'; // <-- Adicione esta linha
+  carregarMetricasOffline(); // Chama a função de JSON ao carregar
+})();
+</script>
+</body>
+</html>
