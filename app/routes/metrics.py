@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-@router.get("/metricas.json")
+@router.get("/metrics")
 def get_metricas():
     try:
         with open("app/Trabalho_Final_Offline_FaceNet/final/metricas.json", "r", encoding="utf-8") as f:
