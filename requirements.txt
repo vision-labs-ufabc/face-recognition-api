@@ -56,3 +56,5 @@ websockets==16.1.1
 wrapt==2.2.2
 mtcnn
 keras-facenet
+Pillow
+python-multipart
